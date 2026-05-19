@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Matrix Eigen Solver</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #dbeafe, #f1f5f9);
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      background: white;
+      padding: 40px;
+      border-radius: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+      text-align: center;
+    }
+
+    h1 {
+      color: #2563eb;
+      font-size: 42px;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: #555;
+      margin-bottom: 30px;
+      font-size: 18px;
+    }
+
+    .controls {
+      margin-bottom: 30px;
+    }
+
+    select {
+      padding: 10px 15px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+      margin-left: 10px;
+    }
+
+    .matrix {
+      display: grid;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 30px;
+    }
+
+    .matrix input {
+      width: 70px;
+      height: 70px;
+      text-align: center;
+      font-size: 20px;
+      border: 2px solid #93c5fd;
+      border-radius: 15px;
+      outline: none;
+    }
+
+    .matrix input:focus {
+      border-color: #2563eb;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      font-size: 18px;
+      border-radius: 15px;
+      cursor: pointer;
+      transition: 0.3s;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .result {
+      margin-top: 40px;
+      background: #f8fafc;
+      padding: 25px;
+      border-radius: 20px;
+      border: 1px solid #dbeafe;
+      text-align: left;
+    }
+
+    .result h2 {
+      color: #2563eb;
+      margin-bottom: 20px;
+    }
+
+    .eigen-value {
+      color: #16a34a;
+      font-size: 30px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+
+    .vector-box {
+      display: inline-block;
+      background: #dbeafe;
+      color: #1e3a8a;
+      padding: 10px 15px;
+      border-radius: 10px;
+      margin: 5px;
+      font-weight: bold;
+    }
+
+    .footer {
+      margin-top: 30px;
+      color: #666;
+      font-size: 14px;
+    }
+
+    @media (max-width: 600px) {
+      .matrix input {
+        width: 55px;
+        height: 55px;
+        font-size: 18px;
+      }
+
+      h1 {
+        font-size: 32px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Matrix Eigen Solver</h1>
+    <p class="subtitle">
+      Enter a square matrix to calculate Eigen Values and Eigen Vectors.
+    </p>
+
+    <div class="controls">
+      <label><strong>Matrix Size:</strong></label>
+      <select id="matrixSize">
+        <option value="2">2 × 2</option>
+        <option value="3">3 × 3</option>
+        <option value="4">4 × 4</option>
+      </select>
+    </div>
+
+    <div id="matrix" class="matrix"></div>
+
+    <button onclick="calculateEigen()">
+      Calculate Eigen Values & Vectors
+    </button>
+
+    <div id="result"></div>
+
+    <div class="footer">
+      Uses Power Iteration Method to estimate the dominant eigen value and eigen vector.
+    </div>
+  </div>
+
+  <script>
+    const matrixContainer = document.getElementById('matrix');
+    const sizeSelector = document.getElementById('matrixSize');
+    const resultDiv = document.getElementById('result');
+
+    function createMatrix() {
+      const size = parseInt(sizeSelector.value);
+
+      matrixContainer.innerHTML = '';
+      matrixContainer.style.gridTemplateColumns = `repeat(${size}, 70px)`;
+
+      for (let i = 0; i < size * size; i++) {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.value = 0;
+        matrixContainer.appendChild(input);
+      }
+    }
+
+    sizeSelector.addEventListener('change', createMatrix);
+
+    createMatrix();
+
+    function getMatrix() {
+      const size = parseInt(sizeSelector.value);
+      const inputs = matrixContainer.querySelectorAll('input');
+
+      let matrix = [];
+      let index = 0;
+
+      for (let i = 0; i < size; i++) {
+        let row = [];
+
+        for (let j = 0; j < size; j++) {
+          row.push(parseFloat(inputs[index].value) || 0);
+          index++;
+        }
+
+        matrix.push(row);
+      }
+
+      return matrix;
+    }
+
+    function multiplyMatrixVector(matrix, vector) {
+      return matrix.map(row =>
+        row.reduce((sum, value, index) => sum + value * vector[index], 0)
+      );
+    }
+
+    function normalize(vector) {
+      const magnitude = Math.sqrt(
+        vector.reduce((sum, value) => sum + value * value, 0)
+      );
+
+      return vector.map(v => v / magnitude);
+    }
+
+    function calculateEigen() {
+      const matrix = getMatrix();
+      const size = matrix.length;
+
+      let vector = new Array(size).fill(1);
+      let eigenValue = 0;
+
+      for (let iteration = 0; iteration < 100; iteration++) {
+        const newVector = multiplyMatrixVector(matrix, vector);
+
+        eigenValue = Math.max(...newVector.map(v => Math.abs(v)));
+
+        vector = newVector.map(v => v / eigenValue);
+      }
+
+      vector = normalize(vector);
+
+      displayResult(eigenValue, vector);
+    }
+
+    function displayResult(eigenValue, eigenVector) {
+      resultDiv.innerHTML = `
+        <div class="result">
+          <h2>Results</h2>
+
+          <p><strong>Dominant Eigen Value:</strong></p>
+          <div class="eigen-value">
+            ${eigenValue.toFixed(4)}
+          </div>
+
+          <p><strong>Eigen Vector:</strong></p>
+          <div>
+            ${eigenVector
+              .map(v => `<span class="vector-box">${v.toFixed(4)}</span>`)
+              .join('')}
+          </div>
+        </div>
+      `;
+    }
+  </script>
+
+</body>
+</html>
